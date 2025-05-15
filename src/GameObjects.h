@@ -34,7 +34,7 @@ struct Enemy {
     float height;
     float velocity;
     
-    Enemy(float _x, float _y) : x(_x), y(_y), width(0.08f), height(0.08f), velocity(0.001f) {}
+    Enemy(float _x, float _y) : x(_x), y(_y), width(0.08f), height(0.08f), velocity(0.0002f) {} // Changed from 0.001f to 0.0002f
 };
 
 // Collectible coin structure
@@ -56,4 +56,4 @@ struct Flag {
     float height = 0.2f;
     
     Flag(float _x, float _y) : x(_x), y(_y) {}
-}; 
+};

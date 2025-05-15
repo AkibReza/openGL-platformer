@@ -266,10 +266,15 @@ int main()
             gameOver = true; // Fell out of the world
         }
         
-        // Camera following player
-        if (player.x > 0.0f) {
-            cameraOffset = player.x;
-        }
+
+        // Camera following player (Mario-style)
+        float targetOffset = player.x - 0.3f; // Keep player slightly left of center
+        if (targetOffset < 0.0f) targetOffset = 0.0f; // Don't show beyond left boundary
+        if (targetOffset > LEVEL_END_X - 1.0f) targetOffset = LEVEL_END_X - 1.0f; // Don't show beyond right boundary
+        
+        // Smooth camera movement
+        float cameraDelta = targetOffset - cameraOffset;
+        cameraOffset += cameraDelta * 0.1f; // Adjust 0.1f to change smoothing speed
         
         // Update enemies (move back and forth)
         for (Enemy& enemy : enemies) {
