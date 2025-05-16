@@ -26,16 +26,20 @@ struct Platform {
     Platform(float _x, float _y, float _w, float _h) : x(_x), y(_y), width(_w), height(_h) {}
 };
 
-// Enemy structure
+// Modified Enemy struct
 struct Enemy {
     float x;
     float y;
     float width;
     float height;
     float velocity;
+    float patrolLeft;
+    float patrolRight;
     
-    Enemy(float _x, float _y) : x(_x), y(_y), width(0.08f), height(0.08f), velocity(0.00009f) {} // Reduced from 0.0002f to 0.00005f
+    Enemy(float _x, float _y) : x(_x), y(_y), width(0.08f), height(0.08f), 
+           velocity(0.00009f), patrolLeft(_x - 0.3f), patrolRight(_x + 0.3f) {}
 };
+
 
 // Collectible coin structure
 struct Coin {
@@ -56,4 +60,23 @@ struct Flag {
     float height = 0.2f;
     
     Flag(float _x, float _y) : x(_x), y(_y) {}
+};
+
+
+struct Cloud {
+    float x;
+    float y;
+    float speed;
+    float size;
+    
+    Cloud(float _x, float _y, float _s) : x(_x), y(_y), speed(_s), size(0.2f) {}
+};
+
+struct Bird {
+    float x;
+    float y;
+    float speed;
+    float angle;
+    
+    Bird(float _x, float _y) : x(_x), y(_y), speed(0.0005f), angle(0.0f) {}
 };

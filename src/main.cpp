@@ -4,6 +4,7 @@
 #include "GameObjects.h"
 #include "Shaders.h"
 #include "Utils.h"
+#include "glm/glm.hpp"
 
 #include <iostream>
 #include <cmath>
@@ -13,79 +14,134 @@
 #include <iomanip>
 
 // Function prototypes
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
 void initGame();
 void displayInstructions();
 void updateHUD();
+void drawCircleVertices(float* vertices, int segments, float radius);
+void DrawCircle(unsigned int shaderProgram, unsigned int VAO, int transformLoc, int colorLoc, 
+               float x, float y, float size, const glm::vec4& color);
+void DrawTriangle(unsigned int shaderProgram, unsigned int VAO, int transformLoc, int colorLoc, 
+                 float x, float y, float size, const glm::vec4& color);
+void drawCircle();
+void drawTriangle();
 
 // Game state
 float cameraOffset = 0.0f;
 bool gameOver = false;
 bool gameWin = false;
 int score = 0;
+float screenRightLimit = 0.5f; // Right limit for camera to start following
 
 // Game objects
 Player player;
 std::vector<Platform> platforms;
 std::vector<Enemy> enemies;
 std::vector<Coin> coins;
+std::vector<Cloud> clouds;
+std::vector<Bird> birds;
+
 Flag levelFlag(LEVEL_END_X, -0.3f);
 
+// Triangle vertices are defined in Utils.h
+
+void DrawCircle(unsigned int shaderProgram, unsigned int VAO, int transformLoc, int colorLoc, 
+               float x, float y, float size, const glm::vec4& color) {
+    Matrix4 transform;
+    transform.translate(x - cameraOffset, y, 0.0f);
+    transform.scale(size, size, 1.0f);
+    glUseProgram(shaderProgram);
+    glUniformMatrix4fv(transformLoc, 1, GL_FALSE, transform.m);
+    glUniform4f(colorLoc, color.x, color.y, color.z, color.w);
+    glBindVertexArray(VAO);
+    drawCircle();
+}
+
+void DrawTriangle(unsigned int shaderProgram, unsigned int VAO, int transformLoc, int colorLoc, 
+                 float x, float y, float size, const glm::vec4& color) {
+    Matrix4 transform;
+    transform.translate(x - cameraOffset, y, 0.0f);
+    transform.scale(size, size, 1.0f);
+    glUseProgram(shaderProgram);
+    glUniformMatrix4fv(transformLoc, 1, GL_FALSE, transform.m);
+    glUniform4f(colorLoc, color.x, color.y, color.z, color.w);
+    glBindVertexArray(VAO);
+    drawTriangle();
+}
+
+void drawCircle() {
+    // Draw a circle using triangle fan mode (center vertex + outline vertices)
+    const int circleSegments = 32;
+    glDrawArrays(GL_TRIANGLE_FAN, 0, circleSegments + 2);
+}
+
+void drawTriangle() {
+    // Draw a simple triangle (3 vertices)
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+}
+
+void initBackground()
+{
+    // Clouds
+    clouds.push_back(Cloud(-0.8f, 0.7f, 0.00007f));
+    clouds.push_back(Cloud(0.4f, 0.6f, 0.0001f));
+    clouds.push_back(Cloud(1.5f, 0.8f, 0.00009f));
+
+    // Birds
+    birds.push_back(Bird(-0.5f, 0.6f));
+    birds.push_back(Bird(0.8f, 0.7f));
+}
+
 // Initialize game objects
-void initGame() {
-    // Set up platforms (x, y, width, height)
-    platforms.push_back(Platform(-1.0f, -0.5f, 0.5f, 0.1f));
-    platforms.push_back(Platform(-0.3f, -0.7f, 0.5f, 0.1f));
-    platforms.push_back(Platform(0.3f, -0.5f, 0.5f, 0.1f));
-    platforms.push_back(Platform(0.8f, -0.3f, 0.5f, 0.1f));
-    platforms.push_back(Platform(1.3f, -0.5f, 0.5f, 0.1f));
-    platforms.push_back(Platform(1.9f, -0.7f, 0.5f, 0.1f));
-    platforms.push_back(Platform(2.4f, -0.5f, 0.5f, 0.1f));
-    platforms.push_back(Platform(2.9f, -0.3f, 0.5f, 0.1f));
-    platforms.push_back(Platform(3.4f, -0.5f, 0.7f, 0.1f));
-    
-    // Set up ground (a long platform at the bottom)
-    platforms.push_back(Platform(-1.0f, -0.9f, 5.0f, 0.1f));
-    
-    // Add some platform gaps for challenging jumps
-    platforms.push_back(Platform(0.0f, 0.0f, 0.2f, 0.1f));
-    platforms.push_back(Platform(0.5f, 0.1f, 0.2f, 0.1f));
-    platforms.push_back(Platform(1.0f, 0.2f, 0.2f, 0.1f));
-    platforms.push_back(Platform(1.5f, 0.1f, 0.2f, 0.1f));
-    platforms.push_back(Platform(2.0f, 0.0f, 0.2f, 0.1f));
-    
-    // Add a staircase pattern
-    platforms.push_back(Platform(2.5f, 0.0f, 0.3f, 0.1f));
-    platforms.push_back(Platform(2.8f, 0.1f, 0.3f, 0.1f));
-    platforms.push_back(Platform(3.1f, 0.2f, 0.3f, 0.1f));
-    platforms.push_back(Platform(3.4f, 0.3f, 0.3f, 0.1f));
-    
-    // Set up enemies
-    enemies.push_back(Enemy(0.5f, -0.4f));
-    enemies.push_back(Enemy(1.5f, -0.6f));
-    enemies.push_back(Enemy(2.5f, -0.4f));
-    enemies.push_back(Enemy(3.2f, -0.8f));
-    
-    // Set up coins
-    coins.push_back(Coin(-0.3f, -0.5f));
-    coins.push_back(Coin(0.3f, -0.3f));
-    coins.push_back(Coin(1.3f, -0.3f));
-    coins.push_back(Coin(2.3f, -0.3f));
-    // Add coins on the higher platforms
-    coins.push_back(Coin(0.0f, 0.2f));
-    coins.push_back(Coin(0.5f, 0.3f));
-    coins.push_back(Coin(1.0f, 0.4f));
-    coins.push_back(Coin(1.5f, 0.3f));
-    coins.push_back(Coin(2.0f, 0.2f));
-    coins.push_back(Coin(3.4f, 0.5f));
+void initGame()
+{
+    // Reset game objects
+    platforms.clear();
+    enemies.clear();
+    coins.clear();
+
+    // Base platform position
+    float y = -0.5f;
+
+    // Create a series of platforms with gaps
+    // First platform (starting platform)
+    platforms.push_back(Platform(-1.0f, y, 0.5f, 0.1f));
+
+    // Second platform after a small gap
+    platforms.push_back(Platform(-0.3f, y, 0.4f, 0.1f));
+
+    // Third platform after gap
+    platforms.push_back(Platform(0.3f, y, 0.5f, 0.1f));
+
+    // Fourth platform
+    platforms.push_back(Platform(1.0f, y, 0.4f, 0.1f));
+
+    // Fifth platform (end platform)
+    platforms.push_back(Platform(1.7f, y, 0.5f, 0.1f));
+
+    // Add enemies at strategic positions
+    enemies.push_back(Enemy(0.3f, -0.4f)); // On third platform
+    enemies.push_back(Enemy(1.7f, -0.4f)); // On last platform
+
+    // Add coins over gaps and platforms
+    coins.push_back(Coin(-0.6f, -0.2f)); // First platform
+    coins.push_back(Coin(-0.1f, -0.2f)); // Over first gap
+    coins.push_back(Coin(0.5f, -0.2f));  // Third platform
+    coins.push_back(Coin(0.7f, -0.2f));  // Third platform
+    coins.push_back(Coin(1.4f, -0.2f));  // Over last gap
+
+    // Position flag at the end of the last platform
+    levelFlag.x = 2.0f;
+    levelFlag.y = -0.3f;
 }
 
 // Function to display instructions at the start
-void displayInstructions() {
+void displayInstructions()
+{
     std::cout << "===== MARIO-LIKE PLATFORMER GAME =====" << std::endl;
     std::cout << "Controls:" << std::endl;
-    std::cout << "  LEFT ARROW  - Move left" << std::endl;
+    std::cout << "  LEFT ARROW  - Move left (but cannot move behind camera)" << std::endl;
     std::cout << "  RIGHT ARROW - Move right" << std::endl;
     std::cout << "  SPACE/UP    - Jump" << std::endl;
     std::cout << "  R           - Restart game" << std::endl;
@@ -99,16 +155,20 @@ void displayInstructions() {
 }
 
 // Function to draw text on screen (simulated with console output)
-void updateHUD() {
-    // Display the score
-    std::cout << "Score: " << std::setw(6) << std::setfill('0') << score << "                            \r";
-    
-    // Show coins collected
+void updateHUD()
+{
+    // Clear previous line
+    std::cout << "\r                                                 ";
+    // Display the score and coins collected
     int coinsCollected = 0;
-    for (const Coin& coin : coins) {
-        if (coin.collected) coinsCollected++;
+    for (const Coin &coin : coins)
+    {
+        if (coin.collected)
+            coinsCollected++;
     }
-    std::cout << "Coins: " << coinsCollected << "/" << coins.size() << "                               " << std::endl;
+    std::cout << "\rScore: " << std::setw(6) << std::setfill('0') << score
+              << " | Coins: " << coinsCollected << "/" << coins.size();
+    std::cout.flush();
 }
 
 int main()
@@ -124,7 +184,7 @@ int main()
 #endif
 
     // glfw window creation
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Mario-like Platformer", NULL, NULL);
+    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Mario-like Platformer", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -142,233 +202,287 @@ int main()
     }
 
     // build and compile our shader program
-    // vertex shader
     unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
     glCompileShader(vertexShader);
-    // check for shader compile errors
+
     int success;
     char infoLog[512];
     glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
     if (!success)
     {
         glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n"
+                  << infoLog << std::endl;
     }
-    // fragment shader
+
     unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
     glCompileShader(fragmentShader);
-    // check for shader compile errors
+
     glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
     if (!success)
     {
         glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
+        std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n"
+                  << infoLog << std::endl;
     }
-    // link shaders
+
     unsigned int shaderProgram = glCreateProgram();
     glAttachShader(shaderProgram, vertexShader);
     glAttachShader(shaderProgram, fragmentShader);
     glLinkProgram(shaderProgram);
-    // check for linking errors
+
     glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-    if (!success) {
+    if (!success)
+    {
         glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
+        std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n"
+                  << infoLog << std::endl;
     }
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
 
-    // Rectangle vertices (for drawing all game objects)
+    // Rectangle vertices
     float vertices[] = {
-        -0.5f, -0.5f, 0.0f,  // bottom left
-         0.5f, -0.5f, 0.0f,  // bottom right
-         0.5f,  0.5f, 0.0f,  // top right
-         
-        -0.5f, -0.5f, 0.0f,  // bottom left
-         0.5f,  0.5f, 0.0f,  // top right
-        -0.5f,  0.5f, 0.0f   // top left
+        -0.5f, -0.5f, 0.0f,
+        0.5f, -0.5f, 0.0f,
+        0.5f, 0.5f, 0.0f,
+        -0.5f, -0.5f, 0.0f,
+        0.5f, 0.5f, 0.0f,
+        -0.5f, 0.5f, 0.0f
     };
-
-    unsigned int VBO, VAO;
-    glGenVertexArrays(1, &VAO);
+    
+    unsigned int VBO, VAO, circleVAO, circleVBO, triangleVAO, triangleVBO;
+    glGenVertexArrays(1, &VAO);  // For rectangles (platforms/player)
     glGenBuffers(1, &VBO);
     
-    // Setup VAO
+    // Bind rectangle VAO/VBO
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
+    
+    // Circle setup (for sun/clouds)
+    glGenVertexArrays(1, &circleVAO);
+    glGenBuffers(1, &circleVBO);
+
+    // Triangle setup (for birds)
+    glGenVertexArrays(1, &triangleVAO);
+    glGenBuffers(1, &triangleVBO);
+
+    // Circle vertices (dynamic)
+// Circle setup with proper sizing
+const int circleSegments = 32;
+float circleVertices[(circleSegments + 2) * 3]; // +2 for center vertex and closing vertex
+drawCircleVertices(circleVertices, circleSegments, 1.0f);
+
+glBindVertexArray(circleVAO);
+glBindBuffer(GL_ARRAY_BUFFER, circleVBO);
+glBufferData(GL_ARRAY_BUFFER, sizeof(circleVertices), circleVertices, GL_STATIC_DRAW);
+glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+glEnableVertexAttribArray(0);
+
+    
+
+    // Triangle vertices setup
+    glBindVertexArray(triangleVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, triangleVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(triangleVertices), triangleVertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
 
     // Initialize game objects
     initGame();
-    
-    // Get transform uniform location
+    initBackground();
+
     glUseProgram(shaderProgram);
     int transformLoc = glGetUniformLocation(shaderProgram, "transform");
     int colorLocation = glGetUniformLocation(shaderProgram, "ourColor");
-    
-    // Variables for timing
+
     double lastTime = glfwGetTime();
-    
-    // Display instructions at startup
     displayInstructions();
-    
-    // render loop
+
     while (!glfwWindowShouldClose(window) && !gameOver && !gameWin)
     {
-        // Calculate delta time
         double currentTime = glfwGetTime();
         double deltaTime = currentTime - lastTime;
         lastTime = currentTime;
-        
-        // Update animation timer
+
         player.animTime += deltaTime;
-        if (player.animTime > 0.2f) { // Change animation frame every 0.2 seconds
+        if (player.animTime > 0.2f)
+        {
             player.animTime = 0.0f;
-            player.animFrame = (player.animFrame + 1) % 2; // Simple 2-frame animation
+            player.animFrame = (player.animFrame + 1) % 2;
         }
-        
-        // input
+
         processInput(window);
-        
-        // Update player vertical position (gravity)
+
+        // Apply gravity
         player.velocityY -= GRAVITY * deltaTime * 1000;
         player.y += player.velocityY;
-        
-        // Check for platform collisions (for player)
+
+        // Check for platform collisions
         bool onGround = false;
-        for (const Platform& platform : platforms) {
-            // Check if player collides with platform
+        for (const Platform &platform : platforms)
+        {
             if (checkCollision(
-                player.x - player.width/2, player.y - player.height/2, player.width, player.height,
-                platform.x - platform.width/2 - cameraOffset, platform.y - platform.height/2, platform.width, platform.height)) {
-                    
-                // Above platform
-                if (player.velocityY < 0 && 
-                    player.y - player.height/2 > platform.y - platform.height/2 + platform.height/2) {
-                    player.y = platform.y + platform.height/2 + player.height/2;
+                    player.x - player.width / 2, player.y - player.height / 2, player.width, player.height,
+                    platform.x - platform.width / 2 - cameraOffset, platform.y - platform.height / 2, platform.width, platform.height))
+            {
+
+                // Check if player is landing on top of platform
+                if (player.velocityY < 0 &&
+                    (player.y - player.height / 2) > (platform.y + platform.height / 2 - 0.01f))
+                {
+                    player.y = platform.y + platform.height / 2 + player.height / 2;
                     player.velocityY = 0;
                     onGround = true;
                 }
             }
         }
-        
-        // Update player state
-        if (onGround) {
+
+        if (onGround)
+        {
             player.isJumping = false;
         }
-        
-        // Screen boundaries
-        if (player.y < -1.0f) {
-            gameOver = true; // Fell out of the world
-        }
-        
-        // Camera following player (Mario-style)
-        float targetOffset = player.x - 0.3f; // Keep player slightly left of center
-        if (targetOffset < 0.0f) {
-            targetOffset = 0.0f; // Don't show beyond left boundary
-        }
-        if (targetOffset > LEVEL_END_X - 0.85f) { // Changed from 1.5f to 0.8f to show more of the end
-            targetOffset = LEVEL_END_X - 0.85f;
+
+        // Check if player fell off the screen
+        if (player.y < -1.0f)
+        {
+            gameOver = true;
         }
 
-        // Smooth camera movement
-        float cameraDelta = targetOffset - cameraOffset;
-        cameraOffset += cameraDelta * 0.1f;
-        
-        // Update enemies (move back and forth)
-        for (Enemy& enemy : enemies) {
+        // Camera follows player
+        cameraOffset = player.x - screenRightLimit;
+        if (cameraOffset < 0)
+            cameraOffset = 0; // Don't let camera go past left edge
+
+        // Update enemies
+        for (Enemy &enemy : enemies)
+        {
             enemy.x += enemy.velocity;
-            
-            // Simple AI: reverse direction at edges
-            if (enemy.x > 3.0f || enemy.x < -1.0f) {
+            if (enemy.x > enemy.patrolRight || enemy.x < enemy.patrolLeft)
+            {
                 enemy.velocity = -enemy.velocity;
             }
-            
-            // Check for collision with player
+
+            // Check for collision with enemy
             if (checkCollision(
-                player.x - player.width/2, player.y - player.height/2, player.width, player.height,
-                enemy.x - enemy.width/2 - cameraOffset, enemy.y - enemy.height/2, enemy.width, enemy.height)) {
-                // Game over if player touches enemy
+                    player.x - player.width / 2, player.y - player.height / 2, player.width, player.height,
+                    enemy.x - enemy.width / 2 - cameraOffset, enemy.y - enemy.height / 2, enemy.width, enemy.height))
+            {
                 gameOver = true;
             }
         }
-        
-        // Check for coin collection
-        for (Coin& coin : coins) {
+
+        // Check coin collection
+        for (Coin &coin : coins)
+        {
             if (!coin.collected && checkCollision(
-                player.x - player.width/2, player.y - player.height/2, player.width, player.height,
-                coin.x - coin.width/2 - cameraOffset, coin.y - coin.height/2, coin.width, coin.height)) {
+                                       player.x - player.width / 2, player.y - player.height / 2, player.width, player.height,
+                                       coin.x - coin.width / 2 - cameraOffset, coin.y - coin.height / 2, coin.width, coin.height))
+            {
                 coin.collected = true;
                 score += 100;
-                std::cout << "Score: " << score << std::endl;
             }
         }
 
-        // Check if player has reached the level end flag
+        // Check if player reached the flag
         if (checkCollision(
-            player.x - player.width/2, player.y - player.height/2, player.width, player.height,
-            levelFlag.x - levelFlag.width/2 - cameraOffset, levelFlag.y - levelFlag.height/2, levelFlag.width, levelFlag.height)) {
+                player.x - player.width / 2, player.y - player.height / 2, player.width, player.height,
+                levelFlag.x - levelFlag.width / 2 - cameraOffset, levelFlag.y - levelFlag.height / 2, levelFlag.width, levelFlag.height))
+        {
             gameWin = true;
         }
 
-        // Update HUD every few frames for better performance
-        static int frameCount = 0;
-        if (frameCount % 10 == 0) {
-            updateHUD();
-        }
-        frameCount++;
+        updateHUD();
 
-        // render
+        // Rendering
         glClearColor(0.4f, 0.6f, 1.0f, 1.0f); // Sky blue background
         glClear(GL_COLOR_BUFFER_BIT);
 
         glUseProgram(shaderProgram);
-        glBindVertexArray(VAO);
+
+        // Update background objects
+        for (Cloud &cloud : clouds) {
+            cloud.x += cloud.speed;
+            if (cloud.x > 2.5f)
+                cloud.x = -1.5f;
+        }
+
+        for (Bird &bird : birds) {
+         // Update bird position
+    bird.x += bird.speed;
+    bird.angle += 0.05f;
+    if (bird.x > 2.0f)
+        bird.x = -1.0f;
+        }
+
+        // UPDATED RENDERING CODE USING SHAPE-SPECIFIC CALLS
         
+        // Sun (circle)
+        DrawCircle(shaderProgram, circleVAO, transformLoc, colorLocation, 
+                  -0.8f, 0.8f, 0.15f, glm::vec4(1.0f, 0.84f, 0.0f, 1.0f));
+        
+        // Clouds (circles)
+        for (Cloud& cloud : clouds) {
+            DrawCircle(shaderProgram, circleVAO, transformLoc, colorLocation, 
+                      cloud.x, cloud.y, cloud.size, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+        }
+        
+        // Birds (triangles)
+        for (Bird& bird : birds) {
+      DrawTriangle(shaderProgram, triangleVAO, transformLoc, colorLocation, 
+                bird.x, bird.y + sin(bird.angle)*0.02f, 0.05f, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+        }
+
         // Draw platforms
-        for (const Platform& platform : platforms) {
+        glBindVertexArray(VAO);
+        for (const Platform &platform : platforms)
+        {
             Matrix4 transform;
             transform.translate(platform.x - cameraOffset, platform.y, 0.0f);
             transform.scale(platform.width, platform.height, 1.0f);
             glUniformMatrix4fv(transformLoc, 1, GL_FALSE, transform.m);
-            glUniform4f(colorLocation, 0.0f, 0.5f, 0.0f, 1.0f); // Green
+            glUniform4f(colorLocation, 0.5f, 0.35f, 0.05f, 1.0f); // Brown color for platforms
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
-        
+
         // Draw enemies
-        for (const Enemy& enemy : enemies) {
+        for (const Enemy &enemy : enemies)
+        {
             Matrix4 transform;
             transform.translate(enemy.x - cameraOffset, enemy.y, 0.0f);
             transform.scale(enemy.width, enemy.height, 1.0f);
             glUniformMatrix4fv(transformLoc, 1, GL_FALSE, transform.m);
-            glUniform4f(colorLocation, 1.0f, 0.0f, 0.0f, 1.0f); // Red
+            glUniform4f(colorLocation, 1.0f, 0.0f, 0.0f, 1.0f); // Red enemies
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
-        
+
         // Draw coins
-        for (const Coin& coin : coins) {
-            if (!coin.collected) {
+        for (const Coin &coin : coins)
+        {
+            if (!coin.collected)
+            {
                 Matrix4 transform;
                 transform.translate(coin.x - cameraOffset, coin.y, 0.0f);
                 transform.scale(coin.width, coin.height, 1.0f);
                 glUniformMatrix4fv(transformLoc, 1, GL_FALSE, transform.m);
-                glUniform4f(colorLocation, 1.0f, 1.0f, 0.0f, 1.0f); // Yellow
+                glUniform4f(colorLocation, 1.0f, 0.84f, 0.0f, 1.0f); // Gold coins
                 glDrawArrays(GL_TRIANGLES, 0, 6);
             }
         }
-        
-        // Draw level end flag
+
+        // Draw flag
         Matrix4 flagTransform;
         flagTransform.translate(levelFlag.x - cameraOffset, levelFlag.y, 0.0f);
         flagTransform.scale(levelFlag.width, levelFlag.height, 1.0f);
         glUniformMatrix4fv(transformLoc, 1, GL_FALSE, flagTransform.m);
         glUniform4f(colorLocation, 0.0f, 1.0f, 0.0f, 1.0f); // Green flag
         glDrawArrays(GL_TRIANGLES, 0, 6);
-        
+
         // Draw flag pole
         Matrix4 poleTransform;
         poleTransform.translate(levelFlag.x - cameraOffset - 0.05f, levelFlag.y - 0.1f, 0.0f);
@@ -376,42 +490,43 @@ int main()
         glUniformMatrix4fv(transformLoc, 1, GL_FALSE, poleTransform.m);
         glUniform4f(colorLocation, 0.5f, 0.5f, 0.5f, 1.0f); // Gray pole
         glDrawArrays(GL_TRIANGLES, 0, 6);
-        
-        // Draw player with rudimentary animations
+
+        // Draw player
         Matrix4 transform;
-        transform.translate(player.x, player.y + (player.animFrame * 0.01f), 0.0f); // Simple bounce animation
-        
-        // Draw player body
+        transform.translate(player.x - cameraOffset, player.y + (player.animFrame * 0.01f), 0.0f);
         transform.scale(player.width, player.height, 1.0f);
         glUniformMatrix4fv(transformLoc, 1, GL_FALSE, transform.m);
         glUniform4f(colorLocation, 0.0f, 0.0f, 1.0f, 1.0f); // Blue player
         glDrawArrays(GL_TRIANGLES, 0, 6);
-        
-        // Draw player eyes (white circles)
+
+        // Draw player eyes
         Matrix4 eyeTransform;
         float eyeDirection = player.facingRight ? 0.02f : -0.02f;
-        
-        // Right/forward eye
+
         eyeTransform = Matrix4();
-        eyeTransform.translate(player.x + eyeDirection, player.y + 0.02f, 0.0f);
+        eyeTransform.translate(player.x - cameraOffset + eyeDirection, player.y + 0.02f, 0.0f);
         eyeTransform.scale(0.02f, 0.02f, 1.0f);
         glUniformMatrix4fv(transformLoc, 1, GL_FALSE, eyeTransform.m);
-        glUniform4f(colorLocation, 1.0f, 1.0f, 1.0f, 1.0f); // White
+        glUniform4f(colorLocation, 1.0f, 1.0f, 1.0f, 1.0f); // White eyes
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
-        // glfw: swap buffers and poll IO events
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    if (gameWin) {
-        std::cout << std::endl << std::endl;
+    if (gameWin)
+    {
+        std::cout << std::endl
+                  << std::endl;
         std::cout << "=====================================" << std::endl;
         std::cout << "   CONGRATULATIONS! YOU WON!" << std::endl;
         std::cout << "   Final Score: " << score << std::endl;
         std::cout << "=====================================" << std::endl;
-    } else if (gameOver) {
-        std::cout << std::endl << std::endl;
+    }
+    else if (gameOver)
+    {
+        std::cout << std::endl
+                  << std::endl;
         std::cout << "=====================================" << std::endl;
         std::cout << "   GAME OVER!" << std::endl;
         std::cout << "   Final Score: " << score << std::endl;
@@ -419,12 +534,14 @@ int main()
         std::cout << "=====================================" << std::endl;
     }
 
-    // optional: de-allocate all resources
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
+    glDeleteVertexArrays(1, &circleVAO);
+    glDeleteBuffers(1, &circleVBO);
+    glDeleteVertexArrays(1, &triangleVAO);
+    glDeleteBuffers(1, &triangleVBO);
     glDeleteProgram(shaderProgram);
 
-    // glfw: terminate
     glfwTerminate();
     return 0;
 }
@@ -434,24 +551,33 @@ void processInput(GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
-        
+
     // Player movement
-    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+    {
         player.x += MOVEMENT_SPEED;
         player.facingRight = true;
     }
-    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
-        player.x -= MOVEMENT_SPEED;
-        player.facingRight = false;
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+    {
+        // Only allow moving left if not at the camera's left edge
+        if (player.x > cameraOffset - 0.8f)
+        {
+            player.x -= MOVEMENT_SPEED;
+            player.facingRight = false;
+        }
     }
-    if ((glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS || 
-         glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) && !player.isJumping) {
+    if ((glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS ||
+         glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) &&
+        !player.isJumping)
+    {
         player.velocityY = JUMP_FORCE;
         player.isJumping = true;
     }
-    
+
     // Restart game with R key
-    if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) {
+    if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
+    {
         // Reset game state
         player.x = -0.8f;
         player.y = -0.3f;
@@ -461,16 +587,20 @@ void processInput(GLFWwindow *window)
         gameOver = false;
         gameWin = false;
         score = 0;
-        
+
         // Reset collected coins
-        for (Coin& coin : coins) {
+        for (Coin &coin : coins)
+        {
             coin.collected = false;
         }
+
+        // Reinitialize game objects
+        initGame();
     }
 }
 
 // glfw: whenever the window size changed this callback function executes
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+void framebuffer_size_callback(GLFWwindow *window, int width, int height)
 {
     glViewport(0, 0, width, height);
 }
