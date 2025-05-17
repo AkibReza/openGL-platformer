@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <glm/glm.hpp> // Include GLM for glm::vec4
 
 // Player state
 struct Player {
@@ -64,19 +65,62 @@ struct Flag {
 
 
 struct Cloud {
-    float x;
-    float y;
-    float speed;
+    float x, y;
     float size;
+    float bounceOffset;  // For vertical bouncing
     
-    Cloud(float _x, float _y, float _s) : x(_x), y(_y), speed(_s), size(0.2f) {}
+    Cloud(float _x, float _y) 
+        : x(_x), y(_y), size(0.1f), bounceOffset(static_cast<float>(rand()) / RAND_MAX * 6.28f) {}
 };
 
 struct Bird {
-    float x;
-    float y;
+    float x, y;
     float speed;
     float angle;
+    bool movingRight;
+
+    // Reduced speed significantly for smoother movement
+    Bird(float _x, float _y) : x(_x), y(_y), speed(0.0002f), angle(0.0f), movingRight(true) {}
+};
+
+struct Mountain {
+    float x;
+    float y;
+    float width;
+    float height;
+    glm::vec4 color;
     
-    Bird(float _x, float _y) : x(_x), y(_y), speed(0.0005f), angle(0.0f) {}
+    Mountain(float _x, float _y, float _width, float _height, glm::vec4 _color)
+        : x(_x), y(_y), width(_width), height(_height), color(_color) {}
+};
+
+struct Star {
+    float x;
+    float y;
+    float size;
+    float twinkleSpeed;
+    float twinklePhase;
+    
+    Star(float _x, float _y) 
+        : x(_x), y(_y), 
+          size(0.005f + static_cast<float>(rand())/RAND_MAX * 0.005f),
+          twinkleSpeed(1.0f + static_cast<float>(rand())/RAND_MAX * 2.0f),
+          twinklePhase(static_cast<float>(rand())/RAND_MAX * 6.28f) {}
+};
+
+struct GrassTuft {
+    float x;
+    float y;
+    float height;
+    
+    GrassTuft(float _x, float _y, float _height)
+        : x(_x), y(_y), height(_height) {}
+};
+
+struct Tree {
+    float x, y;
+    float size;
+    
+    Tree(float x, float y, float size) 
+        : x(x), y(y), size(size) {}
 };

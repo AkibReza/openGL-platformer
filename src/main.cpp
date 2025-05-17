@@ -41,6 +41,8 @@ std::vector<Enemy> enemies;
 std::vector<Coin> coins;
 std::vector<Cloud> clouds;
 std::vector<Bird> birds;
+std::vector<Mountain> mountains;
+std::vector<Tree> trees;
 
 Flag levelFlag(LEVEL_END_X, -0.3f);
 
@@ -83,14 +85,38 @@ void drawTriangle() {
 
 void initBackground()
 {
-    // Clouds
-    clouds.push_back(Cloud(-0.8f, 0.7f, 0.00007f));
-    clouds.push_back(Cloud(0.4f, 0.6f, 0.0001f));
-    clouds.push_back(Cloud(1.5f, 0.8f, 0.00009f));
+    // Create clouds at different positions and heights
+    clouds.push_back(Cloud(-0.8f, 0.7f));
+    clouds.push_back(Cloud(0.4f, 0.6f));
+    clouds.push_back(Cloud(1.5f, 0.8f));
+    clouds.push_back(Cloud(-0.2f, 0.75f));    // New cloud
+    clouds.push_back(Cloud(0.9f, 0.65f));     // New cloud
+    clouds.push_back(Cloud(2.0f, 0.7f));      // New cloud
+    clouds.push_back(Cloud(-1.2f, 0.55f));    // New cloud
+    clouds.push_back(Cloud(1.2f, 0.85f));     // New cloud
 
-    // Birds
-    birds.push_back(Bird(-0.5f, 0.6f));
-    birds.push_back(Bird(0.8f, 0.7f));
+    // Initialize birds
+    birds.push_back(Bird(-0.5f, 0.5f));
+    birds.push_back(Bird(0.2f, 0.4f));
+    birds.push_back(Bird(0.8f, 0.6f));
+    birds.push_back(Bird(1.4f, 0.5f));
+
+    // Initialize mountains with green colors and proper bottom alignment
+    mountains.push_back(Mountain(-0.8f, -0.7f, 0.8f, 0.4f, 
+        glm::vec4(0.2f, 0.4f, 0.2f, 1.0f))); // Dark forest green
+    mountains.push_back(Mountain(0.2f, -0.55f, 1.0f, 0.5f, 
+        glm::vec4(0.25f, 0.45f, 0.25f, 1.0f))); // Medium forest green
+    mountains.push_back(Mountain(1.0f, -0.55f, 0.9f, 0.45f, 
+        glm::vec4(0.3f, 0.5f, 0.3f, 1.0f))); // Light forest green
+    mountains.push_back(Mountain(1.8f, -0.55f, 0.7f, 0.35f, 
+        glm::vec4(0.35f, 0.55f, 0.35f, 1.0f))); // Lighter forest green
+
+    // Initialize trees with better spacing and sizing
+    trees.push_back(Tree(-0.9f, -0.4f, 0.2f));
+    trees.push_back(Tree(-0.3f, -0.4f, 0.25f));
+    trees.push_back(Tree(0.4f, -0.4f, 0.22f));
+    trees.push_back(Tree(1.2f, -0.4f, 0.23f));
+    trees.push_back(Tree(1.9f, -0.4f, 0.21f));
 }
 
 // Initialize game objects
@@ -171,6 +197,8 @@ void updateHUD()
     std::cout.flush();
 }
 
+unsigned int VBO, VAO, circleVAO, circleVBO, triangleVAO, triangleVBO;
+
 int main()
 {
     // glfw: initialize and configure
@@ -243,7 +271,6 @@ int main()
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
 
-    // Rectangle vertices
     float vertices[] = {
         -0.5f, -0.5f, 0.0f,
         0.5f, -0.5f, 0.0f,
@@ -253,17 +280,15 @@ int main()
         -0.5f, 0.5f, 0.0f
     };
     
-    unsigned int VBO, VAO, circleVAO, circleVBO, triangleVAO, triangleVBO;
-    glGenVertexArrays(1, &VAO);  // For rectangles (platforms/player)
+    // Set up the VAO/VBO for rectangular shapes (platforms, player, enemies, etc.)
+    glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
-    
-    // Bind rectangle VAO/VBO
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    
+
     // Circle setup (for sun/clouds)
     glGenVertexArrays(1, &circleVAO);
     glGenBuffers(1, &circleVBO);
@@ -273,18 +298,16 @@ int main()
     glGenBuffers(1, &triangleVBO);
 
     // Circle vertices (dynamic)
-// Circle setup with proper sizing
-const int circleSegments = 32;
-float circleVertices[(circleSegments + 2) * 3]; // +2 for center vertex and closing vertex
-drawCircleVertices(circleVertices, circleSegments, 1.0f);
+    // Circle setup with proper sizing
+    const int circleSegments = 32;
+    float circleVertices[(circleSegments + 2) * 3]; // +2 for center vertex and closing vertex
+    drawCircleVertices(circleVertices, circleSegments, 1.0f);
 
-glBindVertexArray(circleVAO);
-glBindBuffer(GL_ARRAY_BUFFER, circleVBO);
-glBufferData(GL_ARRAY_BUFFER, sizeof(circleVertices), circleVertices, GL_STATIC_DRAW);
-glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-glEnableVertexAttribArray(0);
-
-    
+    glBindVertexArray(circleVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, circleVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(circleVertices), circleVertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
 
     // Triangle vertices setup
     glBindVertexArray(triangleVAO);
@@ -301,9 +324,19 @@ glEnableVertexAttribArray(0);
     int transformLoc = glGetUniformLocation(shaderProgram, "transform");
     int colorLocation = glGetUniformLocation(shaderProgram, "ourColor");
 
+    // Make sure these uniform locations are correctly retrieved
+    transformLoc = glGetUniformLocation(shaderProgram, "transform");
+    colorLocation = glGetUniformLocation(shaderProgram, "ourColor");
+
+    // Check if uniform locations are valid
+    if (transformLoc == -1 || colorLocation == -1) {
+        std::cout << "Error: Failed to get uniform locations" << std::endl;
+    }
+
     double lastTime = glfwGetTime();
     displayInstructions();
 
+    // Main game loop
     while (!glfwWindowShouldClose(window) && !gameOver && !gameWin)
     {
         double currentTime = glfwGetTime();
@@ -403,37 +436,68 @@ glEnableVertexAttribArray(0);
         glClearColor(0.4f, 0.6f, 1.0f, 1.0f); // Sky blue background
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glUseProgram(shaderProgram);
-
-        // Update background objects
-        for (Cloud &cloud : clouds) {
-            cloud.x += cloud.speed;
-            if (cloud.x > 2.5f)
-                cloud.x = -1.5f;
+        // Draw mountains (triangular shape)
+        for (const Mountain& mountain : mountains) {
+            // Draw mountain as a triangle
+            Matrix4 transform;
+            transform.translate(mountain.x - cameraOffset * 0.5f, mountain.y, 0.0f);
+            
+            // Use triangleVAO for mountain shape
+            glBindVertexArray(triangleVAO);
+            transform.scale(mountain.width * 2.0f, mountain.height * 2.0f, 1.0f);
+            glUniformMatrix4fv(transformLoc, 1, GL_FALSE, transform.m);
+            glUniform4f(colorLocation, 
+                        mountain.color.x,
+                        mountain.color.y, 
+                        mountain.color.z, 
+                        mountain.color.w);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
         }
 
-        for (Bird &bird : birds) {
-         // Update bird position
-    bird.x += bird.speed;
-    bird.angle += 0.05f;
-    if (bird.x > 2.0f)
-        bird.x = -1.0f;
+        // Draw trees (after mountains but before other game elements)
+        for (const Tree& tree : trees) {
+            // Draw trunk
+            Matrix4 trunkTransform;
+            trunkTransform.translate(tree.x - cameraOffset * 0.7f, tree.y, 0.0f);
+            trunkTransform.scale(tree.size * 0.2f, tree.size * 0.8f, 1.0f);
+            glUniformMatrix4fv(transformLoc, 1, GL_FALSE, trunkTransform.m);
+            glUniform4f(colorLocation, 0.45f, 0.3f, 0.2f, 1.0f); // Brown trunk
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+
+            // Draw tree crown (triangle shape)
+            Matrix4 crownTransform;
+            crownTransform.translate(tree.x - cameraOffset * 0.7f, tree.y + tree.size * 0.8f, 0.0f);
+            crownTransform.scale(tree.size * 1.2f, tree.size * 1.5f, 1.0f);
+            glUniformMatrix4fv(transformLoc, 1, GL_FALSE, crownTransform.m);
+            glUniform4f(colorLocation, 0.1f, 0.6f, 0.1f, 1.0f); // Green crown
+            glBindVertexArray(triangleVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
         }
 
-        // UPDATED RENDERING CODE USING SHAPE-SPECIFIC CALLS
-        
         // Sun (circle)
         DrawCircle(shaderProgram, circleVAO, transformLoc, colorLocation, 
                   -0.8f, 0.8f, 0.15f, glm::vec4(1.0f, 0.84f, 0.0f, 1.0f));
         
         // Clouds (circles)
-        for (Cloud& cloud : clouds) {
+        for (const Cloud& cloud : clouds) {
+            // Main cloud circle
             DrawCircle(shaderProgram, circleVAO, transformLoc, colorLocation, 
                       cloud.x, cloud.y, cloud.size, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+            
+            // Additional circles to form a cloud shape
+            DrawCircle(shaderProgram, circleVAO, transformLoc, colorLocation, 
+                      cloud.x + 0.08f, cloud.y, cloud.size * 0.8f, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+            
+            DrawCircle(shaderProgram, circleVAO, transformLoc, colorLocation, 
+                      cloud.x - 0.08f, cloud.y, cloud.size * 0.9f, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+            
+            DrawCircle(shaderProgram, circleVAO, transformLoc, colorLocation, 
+                      cloud.x, cloud.y + 0.03f, cloud.size * 0.7f, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
         }
         
         // Birds (triangles)
-        for (Bird& bird : birds) {
+        for (Bird &bird : birds) {
       DrawTriangle(shaderProgram, triangleVAO, transformLoc, colorLocation, 
                 bird.x, bird.y + sin(bird.angle)*0.02f, 0.05f, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
         }
@@ -509,6 +573,43 @@ glEnableVertexAttribArray(0);
         glUniformMatrix4fv(transformLoc, 1, GL_FALSE, eyeTransform.m);
         glUniform4f(colorLocation, 1.0f, 1.0f, 1.0f, 1.0f); // White eyes
         glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // Update and draw birds
+for (Bird& bird : birds) {
+    float time = (float)glfwGetTime();
+    
+    // Horizontal movement
+    if (bird.movingRight) {
+        bird.x += bird.speed * (0.8f + sin(time * 0.5f) * 0.2f);
+        if (bird.x > 2.5f) bird.movingRight = false;
+    } else {
+        bird.x -= bird.speed * (0.8f + sin(time * 0.5f) * 0.2f);
+        if (bird.x < -1.5f) bird.movingRight = true;
+    }
+    
+    // Vertical body movement
+    bird.angle += 0.01f;
+    float yOffset = sin(bird.angle) * 0.015f;
+    
+    float direction = bird.movingRight ? 1.0f : -1.0f;
+    glm::vec4 birdColor(0.2f, 0.2f, 0.2f, 1.0f);
+    float bodySize = 0.04f;
+    
+    // Main body triangle
+    DrawTriangle(shaderProgram, triangleVAO, transformLoc, colorLocation,
+                bird.x, bird.y + yOffset, bodySize,
+                birdColor);
+    
+    // Wing animation - more pronounced up/down movement
+    float wingFlap = sin(time * 8.0f) * 0.04f;  // Faster and larger vertical movement
+    
+    // Wing triangle with emphasized vertical flapping
+    DrawTriangle(shaderProgram, triangleVAO, transformLoc, colorLocation,
+                bird.x - (0.03f * direction), 
+                bird.y + yOffset + wingFlap,  // Add vertical flapping offset
+                bodySize * 0.6f,
+                birdColor);
+}
 
         glfwSwapBuffers(window);
         glfwPollEvents();
