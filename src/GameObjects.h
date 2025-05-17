@@ -23,8 +23,11 @@ struct Platform {
     float y;
     float width;
     float height;
+    float initialY;     // Store initial Y position
+    float floatTimer;   // Timer for floating animation
     
-    Platform(float _x, float _y, float _w, float _h) : x(_x), y(_y), width(_w), height(_h) {}
+    Platform(float _x, float _y, float _w, float _h) 
+        : x(_x), y(_y), width(_w), height(_h), initialY(_y), floatTimer(0.0f) {}
 };
 
 // Modified Enemy struct
@@ -38,14 +41,15 @@ struct Enemy {
     float patrolRight;
     
     Enemy(float _x, float _y) : x(_x), y(_y), width(0.08f), height(0.08f), 
-           velocity(0.00009f), patrolLeft(_x - 0.3f), patrolRight(_x + 0.3f) {}
+           velocity(0.00009f), 
+           patrolLeft(_x - 0.8f),    // Increased from 0.3f to 0.8f
+           patrolRight(_x + 0.8f) {} // Increased from 0.3f to 0.8f
 };
 
 
 // Collectible coin structure
 struct Coin {
-    float x;
-    float y;
+    float x, y;
     float width = 0.05f;
     float height = 0.05f;
     bool collected = false;
@@ -120,7 +124,19 @@ struct GrassTuft {
 struct Tree {
     float x, y;
     float size;
+    float initialY;     // Store initial Y position
+    float floatTimer;   // Timer for floating animation
     
     Tree(float x, float y, float size) 
-        : x(x), y(y), size(size) {}
+        : x(x), y(y), size(size), initialY(y), floatTimer(0.0f) {}
+};
+
+struct Sun {
+    float x;
+    float y;
+    float size;
+    float rotation;
+    
+    Sun(float _x, float _y) 
+        : x(_x), y(_y), size(0.15f), rotation(0.0f) {}
 };

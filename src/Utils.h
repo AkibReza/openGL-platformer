@@ -3,12 +3,14 @@
 
 // Simple matrix struct for 2D transformations
 struct Matrix4 {
-    float m[16] = {
-        1.0f, 0.0f, 0.0f, 0.0f,
-        0.0f, 1.0f, 0.0f, 0.0f,
-        0.0f, 0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 0.0f, 1.0f
-    };
+    float m[16];
+
+    Matrix4() {
+        // Initialize to identity matrix
+        for (int i = 0; i < 16; i++)
+            m[i] = 0.0f;
+        m[0] = m[5] = m[10] = m[15] = 1.0f;
+    }
     
     void translate(float x, float y, float z) {
         m[12] += x;
@@ -20,6 +22,36 @@ struct Matrix4 {
         m[0] *= x;
         m[5] *= y;
         m[10] *= z;
+    }
+
+    // Add this rotate method to Matrix4
+    void rotate(float angle) {
+        float c = cos(angle);
+        float s = sin(angle);
+        
+        // Create rotation matrix
+        float rotMatrix[16] = {
+            c,   -s,    0.0f, 0.0f,
+            s,    c,    0.0f, 0.0f,
+            0.0f, 0.0f, 1.0f, 0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f
+        };
+        
+        // Multiply current matrix with rotation matrix
+        float temp[16];
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                temp[i * 4 + j] = 0.0f;
+                for (int k = 0; k < 4; k++) {
+                    temp[i * 4 + j] += m[i * 4 + k] * rotMatrix[k * 4 + j];
+                }
+            }
+        }
+        
+        // Copy result back to matrix
+        for (int i = 0; i < 16; i++) {
+            m[i] = temp[i];
+        }
     }
 };
 

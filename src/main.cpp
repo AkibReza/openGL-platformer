@@ -53,11 +53,10 @@ void DrawCircle(unsigned int shaderProgram, unsigned int VAO, int transformLoc, 
     Matrix4 transform;
     transform.translate(x - cameraOffset, y, 0.0f);
     transform.scale(size, size, 1.0f);
-    glUseProgram(shaderProgram);
     glUniformMatrix4fv(transformLoc, 1, GL_FALSE, transform.m);
     glUniform4f(colorLoc, color.x, color.y, color.z, color.w);
     glBindVertexArray(VAO);
-    drawCircle();
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 32 + 2);  // Draw circle with triangle fan
 }
 
 void DrawTriangle(unsigned int shaderProgram, unsigned int VAO, int transformLoc, int colorLoc, 
@@ -146,9 +145,14 @@ void initGame()
     // Fifth platform (end platform)
     platforms.push_back(Platform(1.7f, y, 0.5f, 0.1f));
 
-    // Add enemies at strategic positions
-    enemies.push_back(Enemy(0.3f, -0.4f)); // On third platform
-    enemies.push_back(Enemy(1.7f, -0.4f)); // On last platform
+    // Add enemies at strategic positions with faster movement
+    Enemy enemy1(0.3f, -0.4f);
+    enemy1.velocity = 0.0002f;  // Doubled speed
+    enemies.push_back(enemy1);
+
+    Enemy enemy2(1.7f, -0.4f);
+    enemy2.velocity = 0.0002f;  // Doubled speed
+    enemies.push_back(enemy2);
 
     // Add coins over gaps and platforms
     coins.push_back(Coin(-0.6f, -0.2f)); // First platform
@@ -198,6 +202,15 @@ void updateHUD()
 }
 
 unsigned int VBO, VAO, circleVAO, circleVBO, triangleVAO, triangleVBO;
+float diamondVertices[] = {
+    0.0f,  1.0f, 0.0f,   // top
+    1.0f,  0.0f, 0.0f,   // right
+    0.0f, -1.0f, 0.0f,   // bottom
+    -1.0f, 0.0f, 0.0f,   // left
+    0.0f,  1.0f, 0.0f,   // top (repeated for triangle fan)
+};
+
+unsigned int diamondVAO, diamondVBO;
 
 int main()
 {
@@ -297,6 +310,10 @@ int main()
     glGenVertexArrays(1, &triangleVAO);
     glGenBuffers(1, &triangleVBO);
 
+    // Diamond setup (for coins)
+    glGenVertexArrays(1, &diamondVAO);
+    glGenBuffers(1, &diamondVBO);
+
     // Circle vertices (dynamic)
     // Circle setup with proper sizing
     const int circleSegments = 32;
@@ -313,6 +330,13 @@ int main()
     glBindVertexArray(triangleVAO);
     glBindBuffer(GL_ARRAY_BUFFER, triangleVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(triangleVertices), triangleVertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // Diamond vertices setup
+    glBindVertexArray(diamondVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, diamondVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(diamondVertices), diamondVertices, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
@@ -337,11 +361,28 @@ int main()
     displayInstructions();
 
     // Main game loop
+    float lastFrame = 0.0f;
+    float deltaTime = 0.0f;
+
     while (!glfwWindowShouldClose(window) && !gameOver && !gameWin)
     {
-        double currentTime = glfwGetTime();
-        double deltaTime = currentTime - lastTime;
-        lastTime = currentTime;
+        float currentFrame = glfwGetTime();
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Update platform and tree positions
+        float floatSpeed = 2.0f;
+        float floatAmplitude = 0.03f;
+
+        for (Platform& platform : platforms) {
+            platform.floatTimer += deltaTime;
+            platform.y = platform.initialY + sin(platform.floatTimer * floatSpeed) * floatAmplitude;
+        }
+
+        for (Tree& tree : trees) {
+            tree.floatTimer += deltaTime;
+            tree.y = tree.initialY + sin(tree.floatTimer * floatSpeed) * floatAmplitude;
+        }
 
         player.animTime += deltaTime;
         if (player.animTime > 0.2f)
@@ -475,10 +516,45 @@ int main()
             glDrawArrays(GL_TRIANGLES, 0, 3);
         }
 
-        // Sun (circle)
-        DrawCircle(shaderProgram, circleVAO, transformLoc, colorLocation, 
-                  -0.8f, 0.8f, 0.15f, glm::vec4(1.0f, 0.84f, 0.0f, 1.0f));
+        // Draw rotating sun with rays
+       // Draw rotating sun with rays
+{
+    float time = (float)glfwGetTime();
+    float rotationAngle = time * 0.2f; // Rotation speed
+    float pulse = sin(time * 2.0f) * 0.01f + 1.0f; // Subtle pulsing effect
+    
+    // Main sun circle
+    Matrix4 sunTransform;
+    // First scale (applied first)
+    sunTransform.scale(0.15f * pulse, 0.15f * pulse, 1.0f);
+    // Then rotate (applied second)
+    sunTransform.rotate(rotationAngle);
+    // Finally translate to position (applied last)
+    sunTransform.translate(-0.8f, 0.8f, 0.0f);
+    
+    glUniformMatrix4fv(transformLoc, 1, GL_FALSE, sunTransform.m);
+    glUniform4f(colorLocation, 1.0f, 0.84f, 0.0f, 1.0f);
+    glBindVertexArray(circleVAO);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 32 + 2);
+    
+    // Sun rays
+    for (int i = 0; i < 8; i++) {
+        float rayAngle = rotationAngle + (i * 3.14159f / 4.0f);
+        float rayLength = 0.05f * pulse;
         
+        Matrix4 rayTransform;
+        // Order matters: scale -> rotate -> translate
+        rayTransform.scale(0.02f, rayLength, 1.0f);
+        rayTransform.rotate(rayAngle);
+        rayTransform.translate(-0.8f + cos(rayAngle) * 0.2f, 
+                             0.8f + sin(rayAngle) * 0.2f, 0.0f);
+        
+        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, rayTransform.m);
+        glUniform4f(colorLocation, 1.0f, 0.9f, 0.3f, 1.0f);
+        glBindVertexArray(triangleVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+    }
+}
         // Clouds (circles)
         for (const Cloud& cloud : clouds) {
             // Main cloud circle
@@ -498,8 +574,8 @@ int main()
         
         // Birds (triangles)
         for (Bird &bird : birds) {
-      DrawTriangle(shaderProgram, triangleVAO, transformLoc, colorLocation, 
-                bird.x, bird.y + sin(bird.angle)*0.02f, 0.05f, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+            DrawTriangle(shaderProgram, triangleVAO, transformLoc, colorLocation, 
+                    bird.x, bird.y + sin(bird.angle)*0.02f, 0.05f, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
         }
 
         // Draw platforms
@@ -525,17 +601,19 @@ int main()
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
 
-        // Draw coins
-        for (const Coin &coin : coins)
+        // Draw coins (no rotation)
+        for (Coin &coin : coins)
         {
             if (!coin.collected)
             {
                 Matrix4 transform;
                 transform.translate(coin.x - cameraOffset, coin.y, 0.0f);
                 transform.scale(coin.width, coin.height, 1.0f);
+                
                 glUniformMatrix4fv(transformLoc, 1, GL_FALSE, transform.m);
                 glUniform4f(colorLocation, 1.0f, 0.84f, 0.0f, 1.0f); // Gold coins
-                glDrawArrays(GL_TRIANGLES, 0, 6);
+                glBindVertexArray(diamondVAO);
+                glDrawArrays(GL_TRIANGLE_FAN, 0, 5);
             }
         }
 
@@ -561,6 +639,7 @@ int main()
         transform.scale(player.width, player.height, 1.0f);
         glUniformMatrix4fv(transformLoc, 1, GL_FALSE, transform.m);
         glUniform4f(colorLocation, 0.0f, 0.0f, 1.0f, 1.0f); // Blue player
+        glBindVertexArray(VAO);  // Make sure to bind the rectangular VAO before drawing
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         // Draw player eyes
@@ -575,41 +654,41 @@ int main()
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         // Update and draw birds
-for (Bird& bird : birds) {
-    float time = (float)glfwGetTime();
-    
-    // Horizontal movement
-    if (bird.movingRight) {
-        bird.x += bird.speed * (0.8f + sin(time * 0.5f) * 0.2f);
-        if (bird.x > 2.5f) bird.movingRight = false;
-    } else {
-        bird.x -= bird.speed * (0.8f + sin(time * 0.5f) * 0.2f);
-        if (bird.x < -1.5f) bird.movingRight = true;
-    }
-    
-    // Vertical body movement
-    bird.angle += 0.01f;
-    float yOffset = sin(bird.angle) * 0.015f;
-    
-    float direction = bird.movingRight ? 1.0f : -1.0f;
-    glm::vec4 birdColor(0.2f, 0.2f, 0.2f, 1.0f);
-    float bodySize = 0.04f;
-    
-    // Main body triangle
-    DrawTriangle(shaderProgram, triangleVAO, transformLoc, colorLocation,
-                bird.x, bird.y + yOffset, bodySize,
-                birdColor);
-    
-    // Wing animation - more pronounced up/down movement
-    float wingFlap = sin(time * 8.0f) * 0.04f;  // Faster and larger vertical movement
-    
-    // Wing triangle with emphasized vertical flapping
-    DrawTriangle(shaderProgram, triangleVAO, transformLoc, colorLocation,
-                bird.x - (0.03f * direction), 
-                bird.y + yOffset + wingFlap,  // Add vertical flapping offset
-                bodySize * 0.6f,
-                birdColor);
-}
+        for (Bird& bird : birds) {
+            float time = (float)glfwGetTime();
+            
+            // Horizontal movement
+            if (bird.movingRight) {
+                bird.x += bird.speed * (0.8f + sin(time * 0.5f) * 0.2f);
+                if (bird.x > 2.5f) bird.movingRight = false;
+            } else {
+                bird.x -= bird.speed * (0.8f + sin(time * 0.5f) * 0.2f);
+                if (bird.x < -1.5f) bird.movingRight = true;
+            }
+            
+            // Vertical body movement
+            bird.angle += 0.01f;
+            float yOffset = sin(bird.angle) * 0.015f;
+            
+            float direction = bird.movingRight ? 1.0f : -1.0f;
+            glm::vec4 birdColor(0.2f, 0.2f, 0.2f, 1.0f);
+            float bodySize = 0.04f;
+            
+            // Main body triangle
+            DrawTriangle(shaderProgram, triangleVAO, transformLoc, colorLocation,
+                        bird.x, bird.y + yOffset, bodySize,
+                        birdColor);
+            
+            // Wing animation - more pronounced up/down movement
+            float wingFlap = sin(time * 8.0f) * 0.04f;  // Faster and larger vertical movement
+            
+            // Wing triangle with emphasized vertical flapping
+            DrawTriangle(shaderProgram, triangleVAO, transformLoc, colorLocation,
+                        bird.x - (0.03f * direction), 
+                        bird.y + yOffset + wingFlap,  // Add vertical flapping offset
+                        bodySize * 0.6f,
+                        birdColor);
+        }
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -641,6 +720,8 @@ for (Bird& bird : birds) {
     glDeleteBuffers(1, &circleVBO);
     glDeleteVertexArrays(1, &triangleVAO);
     glDeleteBuffers(1, &triangleVBO);
+    glDeleteVertexArrays(1, &diamondVAO);
+    glDeleteBuffers(1, &diamondVBO);
     glDeleteProgram(shaderProgram);
 
     glfwTerminate();
