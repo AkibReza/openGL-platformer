@@ -40,10 +40,16 @@ struct Enemy {
     float patrolLeft;
     float patrolRight;
     
+    // Add these new variables for zoom animation
+    float scaleTimer = 0.0f;
+    float baseScale = 1.0f;
+    float zoomAmount = 0.2f;    // How much it zooms (20%)
+    float zoomSpeed = 2.0f;     // Speed of zoom animation
+    
     Enemy(float _x, float _y) : x(_x), y(_y), width(0.08f), height(0.08f), 
            velocity(0.00009f), 
-           patrolLeft(_x - 0.8f),    // Increased from 0.3f to 0.8f
-           patrolRight(_x + 0.8f) {} // Increased from 0.3f to 0.8f
+           patrolLeft(_x - 0.8f),
+           patrolRight(_x + 0.8f) {} 
 };
 
 

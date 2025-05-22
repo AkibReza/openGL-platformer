@@ -150,6 +150,10 @@ void initGameInternal() // Renamed to avoid conflict, called by restartGame
     // Fifth platform (end platform)
     platforms.push_back(Platform(1.7f, y, 0.5f, 0.1f));
 
+    // After platforms are created
+    levelFlag.x = platforms.back().x + platforms.back().width/2 + 0.2f;
+    levelFlag.y = platforms.back().y;  // Match platform height
+    
     // Add enemies at strategic positions with faster movement
     Enemy enemy1(0.3f, -0.4f);
     enemy1.velocity = 0.0002f; // Doubled speed
@@ -566,6 +570,42 @@ int main()
         }
 
 
+        // Cloud bouncing
+        for (Cloud &cloud : clouds) {
+            // Update bounce animation
+            float bounceFreq = 0.9f;  // Controls how fast the cloud bounces
+            float bounceAmount = 0.000006f; // Controls how much the cloud moves up/down
+            cloud.bounceOffset += deltaTime * bounceFreq;
+            
+            // Calculate vertical offset using sine wave
+            float verticalOffset = sin(cloud.bounceOffset) * bounceAmount;
+            cloud.y = cloud.y + verticalOffset;
+        }
+
+        // Bird movement update (replace existing bird movement code)
+        const float BIRD_VERTICAL_SPEED = 0.3f;
+        const float BIRD_HORIZONTAL_SPEED = 0.2f;
+        const float BIRD_VERTICAL_RANGE = 0.05f;
+
+        for (Bird &bird : birds) {
+            // Horizontal movement
+            if (bird.movingRight) {
+                bird.x += BIRD_HORIZONTAL_SPEED * deltaTime;
+                if (bird.x > 2.5f + cameraOffset) {
+                    bird.movingRight = false;
+                }
+            } else {
+                bird.x -= BIRD_HORIZONTAL_SPEED * deltaTime;
+                if (bird.x < -1.5f + cameraOffset) {
+                    bird.movingRight = true;
+                }
+            }
+            
+            // Vertical movement (smooth sine wave)
+            bird.angle += BIRD_VERTICAL_SPEED * deltaTime;
+            bird.y = bird.y + sin(bird.angle) * BIRD_VERTICAL_RANGE * deltaTime;
+        }
+
         // Draw mountains (triangular shape)
         for (const Mountain &mountain : mountains)
         {
@@ -686,11 +726,15 @@ int main()
         }
 
         // Draw enemies
-        for (const Enemy &enemy : enemies)
+        for (Enemy &enemy : enemies)
         {
+            // Update scale animation
+            enemy.scaleTimer += deltaTime * enemy.zoomSpeed;
+            float currentScale = enemy.baseScale + sin(enemy.scaleTimer) * enemy.zoomAmount;
+            
             Matrix4 transform;
             transform.translate(enemy.x - cameraOffset, enemy.y, 0.0f);
-            transform.scale(enemy.width, enemy.height, 1.0f);
+            transform.scale(enemy.width * currentScale, enemy.height * currentScale, 1.0f);
             glUniformMatrix4fv(transformLoc, 1, GL_FALSE, transform.m);
             glUniform4f(colorLocation, 1.0f, 0.0f, 0.0f, 1.0f); // Red enemies
             glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -712,29 +756,51 @@ int main()
             }
         }
 
-        // Draw flag pole
-        Matrix4 poleTransform;
-        // Pole base at (levelFlag.x, levelFlag.y), height 0.4f. Center Y = levelFlag.y + 0.2f
-        // levelFlag.x and levelFlag.y are world coordinates.
-        poleTransform.translate(levelFlag.x - cameraOffset, levelFlag.y + 0.2f, 0.0f);
-        poleTransform.scale(0.02f, 0.4f, 1.0f); // width 0.02, height 0.4
-        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, poleTransform.m);
-        glUniform4f(colorLocation, 0.5f, 0.5f, 0.5f, 1.0f); // Gray pole
-        glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        // Draw flag base/platform
+        {
+            Matrix4 baseTransform;
+            baseTransform.translate(levelFlag.x - cameraOffset, levelFlag.y, 0.0f);
+            baseTransform.scale(0.1f, 0.05f, 1.0f);
+            glUniformMatrix4fv(transformLoc, 1, GL_FALSE, baseTransform.m);
+            glUniform4f(colorLocation, 0.5f, 0.35f, 0.05f, 1.0f);
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
 
-        // Draw flag as a triangle
-        Matrix4 flagTransform;
-        // Flag height 0.07f. Attach to top of pole (world y = levelFlag.y + 0.4f).
-        // Center Y of flag: (levelFlag.y + 0.4f) - 0.07f / 2.0f = levelFlag.y + 0.365f
-        // X position: slightly to the right of the pole's world X.
-        flagTransform.translate(levelFlag.x - cameraOffset + 0.05f, levelFlag.y + 0.365f, 0.0f);
-        flagTransform.rotate(-0.5f); // Tilt the flag
-        flagTransform.scale(0.1f, 0.07f, 1.0f); // width 0.1, height 0.07
-        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, flagTransform.m);
-        glUniform4f(colorLocation, 0.0f, 1.0f, 0.0f, 1.0f); // Green flag
-        glBindVertexArray(triangleVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        // Draw flag pole
+        {
+            Matrix4 poleTransform;
+            poleTransform.translate(levelFlag.x - cameraOffset, levelFlag.y + 0.15f, 0.0f);
+            poleTransform.scale(0.02f, 0.3f, 1.0f);
+            glUniformMatrix4fv(transformLoc, 1, GL_FALSE, poleTransform.m);
+            glUniform4f(colorLocation, 0.7f, 0.7f, 0.7f, 1.0f);
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
+
+        // Draw flag
+        {
+            float flagVertices[] = {
+                0.0f, 0.5f, 0.0f,
+                0.0f, -0.5f, 0.0f,
+                -1.0f, 0.0f, 0.0f
+            };
+
+            Matrix4 flagTransform;
+            flagTransform.translate(levelFlag.x - cameraOffset, levelFlag.y + 0.3f, 0.0f);
+            flagTransform.scale(0.08f, 0.1f, 1.0f);
+            
+            glUniformMatrix4fv(transformLoc, 1, GL_FALSE, flagTransform.m);
+            glUniform4f(colorLocation, 0.0f, 1.0f, 0.0f, 1.0f);
+            
+            glBindVertexArray(triangleVAO);
+            glBindBuffer(GL_ARRAY_BUFFER, triangleVBO);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(flagVertices), flagVertices, GL_STATIC_DRAW);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            
+            // Restore original triangle vertices
+            glBufferData(GL_ARRAY_BUFFER, sizeof(triangleVertices), triangleVertices, GL_STATIC_DRAW);
+        }
 
         // Draw player
         Matrix4 transform;
