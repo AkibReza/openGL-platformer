@@ -6,8 +6,8 @@ const unsigned int SCR_HEIGHT = 600;    // Reduced from default height
 
 // Game physics
 const float GRAVITY = 0.000013f;         
-const float JUMP_FORCE = 0.0025f;       // Reduced from 0.005f to 0.015f for more reasonable jump height
-const float MOVEMENT_SPEED = 0.0003f;   
+const float JUMP_FORCE = 0.005f;       // Reduced from 0.005f to 0.015f for more reasonable jump height
+const float MOVEMENT_SPEED = 0.0009f;   
 
 // Game state
 const float LEVEL_END_X = 2.0f;         // Keeping level length the same
